@@ -39,3 +39,8 @@
 
 # debug information files
 *.dwo
+Vk_GaussianSplatViewer/out/
+Vk_GaussianSplatViewer/.vs/
+out/
+build/
+*.bak
