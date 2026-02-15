@@ -3,7 +3,7 @@
 	FATAL_ERROR
 )
 project(
-    Vk-AB-GaussSplatyardEngine
+    Vk-GaussSplatyardEngine
 	LANGUAGES CXX
     VERSION 0.0.1
 )
@@ -11,9 +11,9 @@ project(
 include(cmake/Dependencies.cmake)
 include(GNUInstallDirs)
 
-add_subdirectory(Vk_GaussianSplatViewer)
+add_subdirectory(core)
 
-target_compile_features(Vk_GaussianSplatViewer PRIVATE cxx_std_20)
+target_compile_features(Vk_GaussianSplatyardEngine PRIVATE cxx_std_20)
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
