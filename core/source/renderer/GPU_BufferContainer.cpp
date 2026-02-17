@@ -83,6 +83,21 @@ namespace core::rendering
         }
     }
 
+    void GPU_BufferContainer::map_data(const std::string& buffer_name, void* data, size_t size)
+    {
+        if (auto buffer = get_buffer(buffer_name))
+        {
+            memcpy(buffer->allocation_info.pMappedData, data, size);
+
+            vmaFlushAllocation(
+                engine_context.device_manager->get_allocator(),
+                splat_render_params_buffer .allocation,
+                0,
+                VK_WHOLE_SIZE
+            );
+        }
+    }
+
     void GPU_BufferContainer::allocate_model_matrices_buffer()
     {
         //Allocate a named mapped buffer that supports max_object count of objects for storing model matrices
@@ -176,4 +191,45 @@ namespace core::rendering
     template void GPU_BufferContainer::allocate_named_buffer(const std::string& buffer_name, const std::vector<glm::vec2>& gaussian_parameters, BufferAllocationType allocation_type);
     template void GPU_BufferContainer::allocate_named_buffer(const std::string& buffer_name, const std::vector<uint32_t>& gaussian_parameters, BufferAllocationType allocation_type);
 
+    template <typename N>
+    void GPU_BufferContainer::allocate_named_buffer_simple(const std::string& buffer_name, BufferAllocationType allocation_type)
+    {
+        //Wait for the device to be idle to avoid destroying any tasks that are ongoing
+        // ReSharper disable once CppExpressionWithoutSideEffects
+        engine_context.dispatch_table.deviceWaitIdle();
+
+        auto device_manager = engine_context.device_manager.get();
+
+        //Destroy the old buffer if we have a buffer with the same name
+        if (auto buffer = get_buffer(buffer_name))
+        {
+            vmaDestroyBuffer(device_manager->get_allocator(), buffer->buffer, buffer->allocation);
+            *buffer = { VK_NULL_HANDLE, VK_NULL_HANDLE, {}, {} };
+            buffers.erase(buffer_name);
+        }
+
+        //Recreate it
+        GPU_Buffer new_buffer;
+
+        switch (allocation_type)
+        {
+        case BufferAllocationType::None:
+            break;
+
+        case BufferAllocationType::VertexAllocationWithStaging:
+            //@TODO
+            break;
+
+        case BufferAllocationType::MappedAllocation:
+            utils::MemoryUtils::allocate_buffer_with_mapped_access(engine_context.dispatch_table,
+                                                                   engine_context.device_manager->get_allocator(),
+                                                                   sizeof(N),
+                                                                   new_buffer);
+            break;
+        }
+
+        set_buffer(buffer_name, new_buffer);
+    }
+
+    template void GPU_BufferContainer::allocate_named_buffer_simple<uint32_t>(const std::string& buffer_name, BufferAllocationType allocation_type);
 }

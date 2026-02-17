@@ -20,9 +20,9 @@ namespace core::rendering
         auto gaussian_transparent_fs = platform::DirectoryPath::get().get_shader_path("gaussian_surface", "gaussian_transparent.frag");
 
         material::MaterialUtils material_utils(engine_context);
-        subpass_shaders[ShaderObjectType::TranslucentPass] = material_utils.create_material("translucent_pass",
-            gaussian_transparent_vs,
-            gaussian_transparent_fs, nullptr, 0);
+        subpass_shaders[ShaderObjectType::TranslucentPass] = material_utils.create_material<PushConstantBlock>("translucent_pass",
+                                                                                                gaussian_transparent_vs,
+                                                                                                gaussian_transparent_fs, nullptr, 0);
     }
 
     void TranslucencyPass::render_target_init(EngineRenderTargets& render_targets)
@@ -35,7 +35,7 @@ namespace core::rendering
 
     void TranslucencyPass::frame_pre_recording(){}
 
-    void TranslucencyPass::record_commands(VkCommandBuffer* command_buffer, uint32_t image_index, PushConstantBlock& push_constant_block, SubpassShaderList& subpass_shaders, class
+    void TranslucencyPass::record_commands(VkCommandBuffer* command_buffer, uint32_t image_index, SubpassShaderList& subpass_shaders, class
                                            GPU_BufferContainer& buffer_container, EngineRenderTargets& render_targets, const std::vector<Renderable>& renderables)
     {
          std::vector<VkColorComponentFlags> color_component_flags =

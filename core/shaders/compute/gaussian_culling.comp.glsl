@@ -8,8 +8,6 @@
 #define WORKGROUP_SIZE 1024
 layout (local_size_x = WORKGROUP_SIZE) in;
 
-//The buffer that is sent to the render pass
-
 layout(buffer_reference, std430) readonly buffer CameraData
 {
     mat4 projection_matrix;
@@ -18,7 +16,10 @@ layout(buffer_reference, std430) readonly buffer CameraData
     vec4 hfovxy_focal;
 };
 
-layout(buffer_reference, std430) readonly buffer VisibleSplatID { int visible_gi[]; };
+//The buffer that is sent to the render pass
+layout(buffer_reference, std430) readonly buffer VisibleSplatID { uvec2 visible_gi[]; };
+layout(buffer_reference, std430) buffer VisibleCount            { uint visible_count; };
+
 layout(buffer_reference, std430) readonly buffer SplatID        { int gi[]; };
 layout(buffer_reference, std430) readonly buffer SplatPosition  { vec4 positions[]; };
 
@@ -29,16 +30,19 @@ layout(push_constant) uniform PushConstantsComputeCulling
     SplatPosition splat_positions_address;
 
     VisibleSplatID visible_splat_ids_address;
+    VisibleCount visible_count_address;
 } pc_compute_culling;
 
 void main()
 {
     uint idx = gl_GlobalInvocationID.x;
+    visible_gis.visible_gi[idx] = uvec2(0, 0);
 
     CameraData camera_matrices = pc_compute_culling.camera_data_adddress;
     SplatID splat_ids = pc_compute_culling.splat_ids_address;
     SplatPosition splat_positions = pc_compute_culling.splat_positions_address;
     VisibleSplatID visible_gis = pc_compute_culling.visible_splat_ids_address;
+    VisibleCount visible_count_addr = pc_compute_culling.visible_count_address;
 
     int splat_id = splat_ids.gi[idx];
     vec4 g_pos = splat_positions.positions[splat_id];
@@ -56,5 +60,9 @@ void main()
         return;
     }
 
-    visible_gis.visible_gi[idx] = splat_id;
+    float dist = g_pos_screen.z;
+    uint out_idx = atomicAdd(visible_count_addr.visible_count, 1);
+
+    //Convert float to uint to sort
+    visible_gis.visible_gi[idx] = uvec2(uint((1 - dist * 0.5 + 0.5) * 0xFFFF), gl_GlobalInvocationID.x);
 }

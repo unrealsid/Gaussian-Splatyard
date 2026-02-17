@@ -41,9 +41,14 @@ namespace core::rendering
 
         void map_splat_indices(const std::vector<uint32_t>& indices);
 
+        void map_data(const std::string& buffer_name, void* data, size_t size);
+
         //Allocates a named buffer
         template<typename N>
         void allocate_named_buffer(const std::string& buffer_name, const std::vector<N>& data, BufferAllocationType allocation_type = BufferAllocationType::VertexAllocationWithStaging);
+
+        template<typename N>
+        void allocate_named_buffer_simple(const std::string& buffer_name, BufferAllocationType allocation_type);
 
         GPU_Buffer* get_buffer(const std::string& buffer_name);
 

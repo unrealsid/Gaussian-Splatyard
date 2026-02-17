@@ -28,7 +28,7 @@ namespace core::rendering
     void ScreenspacePass::frame_pre_recording() { }
 
     void ScreenspacePass::record_commands(VkCommandBuffer* command_buffer, uint32_t image_index,
-                                          PushConstantBlock& push_constant_block, SubpassShaderList& subpass_shaders,
+                                          SubpassShaderList& subpass_shaders,
                                           GPU_BufferContainer& buffer_container,
                                           EngineRenderTargets& render_targets, const std::vector<Renderable>& renderables)
     {

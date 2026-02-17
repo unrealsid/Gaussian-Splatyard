@@ -41,7 +41,6 @@ namespace core::rendering
         //Record commands into the buffer. Place draw commands here
         virtual void record_commands(VkCommandBuffer* command_buffer,
                                      uint32_t image_index,
-                                     PushConstantBlock& push_constants,
                                      SubpassShaderList& subpass_shaders,
                                      GPU_BufferContainer& buffer_container,
                                      EngineRenderTargets& render_targets, const std::vector<Renderable>& renderables) = 0;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/Subpass.h"
+#include "structs/scene/PushConstantBlock.h"
 
 namespace core::rendering
 {
@@ -13,10 +14,15 @@ namespace core::rendering
         void subpass_init(SubpassShaderList& subpass_shaders, GPU_BufferContainer& buffer_container) override;
         void render_target_init(EngineRenderTargets& render_targets) override;
         void frame_pre_recording() override;
-        void record_commands(VkCommandBuffer* command_buffer, uint32_t image_index, PushConstantBlock& push_constant_block, SubpassShaderList& subpass_shaders,
+        void record_commands(VkCommandBuffer* command_buffer, uint32_t image_index, SubpassShaderList& subpass_shaders,
                              GPU_BufferContainer& buffer_container, EngineRenderTargets& render_targets, const std::vector<Renderable>& renderables) override;
         void cleanup() override;
 
         bool is_pass_active() const override { return false; }
+
+    private:
+        PushConstantsComputeCulling push_constants_compute_culling{};
+        PushConstantsComputeHistograms push_constants_compute_histograms{};
+        PushConstantsRadixSort push_constants_radix_sort{};
     };
 } // rendering

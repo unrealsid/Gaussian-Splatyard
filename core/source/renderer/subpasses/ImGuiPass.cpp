@@ -118,7 +118,7 @@ namespace core::rendering
     }
 
 
-    void ImGuiPass::record_commands(VkCommandBuffer* command_buffer, uint32_t image_index, PushConstantBlock& push_constant_block, SubpassShaderList& subpass_shaders,
+    void ImGuiPass::record_commands(VkCommandBuffer* command_buffer, uint32_t image_index, SubpassShaderList& subpass_shaders,
                                     GPU_BufferContainer& buffer_container, EngineRenderTargets& render_targets, const std::vector<Renderable>& renderables)
     {
         //Create the color attachments for this pass -- decides what gets rendered

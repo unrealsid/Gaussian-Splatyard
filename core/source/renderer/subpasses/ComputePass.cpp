@@ -6,7 +6,6 @@
 #include "common/Types.h"
 #include "config/Config.inl"
 #include "renderer/Renderer.h"
-#include <iostream>
 
 #include "platform/DirectoryPath.h"
 
@@ -18,15 +17,15 @@ namespace core::rendering
 
         //Culling Pass
         auto culling_shader_path = platform::DirectoryPath::get().get_shader_path("compute", "gaussian_culling.comp");
-        subpass_shaders[ShaderObjectType::CullingComputePass] = material_utils.create_compute_material("compute_pass", culling_shader_path, nullptr, 0);
+        subpass_shaders[ShaderObjectType::CullingComputePass] = material_utils.create_compute_material<PushConstantsComputeCulling>("compute_pass", culling_shader_path, nullptr, 0);
 
         //Histogram Pass
         auto histogram_shader_path = platform::DirectoryPath::get().get_shader_path("compute", "multi_radixsort_histograms.comp");
-        subpass_shaders[ShaderObjectType::HistogramComputePass] = material_utils.create_compute_material("compute_pass", histogram_shader_path, nullptr, 0);
+        subpass_shaders[ShaderObjectType::HistogramComputePass] = material_utils.create_compute_material<PushConstantsComputeHistograms>("compute_pass", histogram_shader_path, nullptr, 0);
 
         //Radix sort
         auto radixsort_shader_path = platform::DirectoryPath::get().get_shader_path("compute", "multi_radixsort.comp");
-        subpass_shaders[ShaderObjectType::SortComputePass] = material_utils.create_compute_material("compute_pass", radixsort_shader_path, nullptr, 0);
+        subpass_shaders[ShaderObjectType::SortComputePass] = material_utils.create_compute_material<PushConstantsRadixSort>("compute_pass", radixsort_shader_path, nullptr, 0);
     }
 
     void ComputePass::render_target_init(EngineRenderTargets& render_targets)
@@ -37,39 +36,27 @@ namespace core::rendering
     {
     }
 
-    void ComputePass::record_commands(VkCommandBuffer* command_buffer, uint32_t image_index, PushConstantBlock& push_constant_block, SubpassShaderList& subpass_shaders,
-                                     GPU_BufferContainer& buffer_container,
-                                     EngineRenderTargets& render_targets,
-                                     const std::vector<Renderable>& renderables)
+    void ComputePass::record_commands(VkCommandBuffer* command_buffer, uint32_t image_index, SubpassShaderList& subpass_shaders,
+                                      GPU_BufferContainer& buffer_container,
+                                      EngineRenderTargets& render_targets,
+                                      const std::vector<Renderable>& renderables)
     {
         auto& compute_material = subpass_shaders[ShaderObjectType::CullingComputePass];
         auto& dispatch_table = engine_context.dispatch_table;
 
         // Populate push constants with splat buffer addresses
-        push_constant_block.camera_data_address = buffer_container.camera_data_buffer.buffer_address;
+        push_constants_compute_culling.camera_data_address = buffer_container.camera_data_buffer.buffer_address;
 
-        auto pos_buffer = buffer_container.get_buffer("positions");
-        if (pos_buffer) push_constant_block.splat_positions_address = pos_buffer->buffer_address;
-
-        auto scale_buffer = buffer_container.get_buffer("scales");
-        if (scale_buffer) push_constant_block.splat_scales_address = scale_buffer->buffer_address;
-
-        auto color_buffer = buffer_container.get_buffer("colors");
-        if (color_buffer) push_constant_block.splat_colors_address = color_buffer->buffer_address;
-
-        auto quat_buffer = buffer_container.get_buffer("quaternions");
-        if (quat_buffer) push_constant_block.splat_quats_address = quat_buffer->buffer_address;
-
-        auto alpha_buffer = buffer_container.get_buffer("alpha");
-        if (alpha_buffer) push_constant_block.splat_alphas_address = alpha_buffer->buffer_address;
-
-        push_constant_block.splat_render_params_address = buffer_container.splat_render_params_buffer.buffer_address;
+        if (auto pos_buffer = buffer_container.get_buffer("positions"))
+        {
+            push_constants_compute_culling.splat_positions_address = pos_buffer->buffer_address;
+        }
 
         // Bind compute shader
         compute_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
 
         // Push constants
-        dispatch_table.cmdPushConstants(*command_buffer, compute_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantBlock), &push_constant_block);
+        dispatch_table.cmdPushConstants(*command_buffer, compute_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsComputeCulling), &push_constants_compute_culling);
 
         // Dispatch
         // Example: dispatch based on buffer size
@@ -96,5 +83,6 @@ namespace core::rendering
 
     void ComputePass::cleanup()
     {
+
     }
 } // rendering

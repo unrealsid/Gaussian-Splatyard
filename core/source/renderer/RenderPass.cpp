@@ -72,8 +72,6 @@ namespace core::rendering
             return;
         }
 
-        PushConstantBlock push_constant_block{};
-
         //Run through all subpasses and record instructions
         for (const auto & subpass : subpasses)
         {
@@ -83,7 +81,6 @@ namespace core::rendering
             {
                 subpass->record_commands(command_buffer,
                     image_index,
-                    push_constant_block,
                     subpass_shader_objects,
                     *(engine_context.buffer_container),
                     engine_render_targets,
@@ -145,8 +142,8 @@ namespace core::rendering
         dispatch_table.beginCommandBuffer(compute_cmd, &begin_info);
 
         PushConstantBlock push_constant_block{};
-        compute_pass->record_commands(&compute_cmd, image_index, push_constant_block, subpass_shader_objects,
-                                       *(engine_context.buffer_container), engine_render_targets, engine_context.renderer->get_renderables());
+        compute_pass->record_commands(&compute_cmd, image_index, subpass_shader_objects, *(engine_context.buffer_container),
+                                      engine_render_targets, engine_context.renderer->get_renderables());
 
         dispatch_table.endCommandBuffer(compute_cmd);
 
