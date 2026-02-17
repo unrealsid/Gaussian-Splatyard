@@ -7,5 +7,9 @@ enum class ShaderObjectType : uint8_t
     OpaquePass,
     TranslucentPass,
     ScreenspacePass,
-    ComputePass
+
+    //Compute Pass
+    CullingComputePass,
+    HistogramComputePass,
+    SortComputePass,
 };

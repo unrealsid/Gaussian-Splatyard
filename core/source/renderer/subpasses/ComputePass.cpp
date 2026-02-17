@@ -14,10 +14,19 @@ namespace core::rendering
 {
     void ComputePass::subpass_init(SubpassShaderList& subpass_shaders, GPU_BufferContainer& buffer_container)
     {
-        auto path = platform::DirectoryPath::get().get_shader_path("compute", "dummy.comp");
-
         material::MaterialUtils material_utils(engine_context);
-        subpass_shaders[ShaderObjectType::ComputePass] = material_utils.create_compute_material("compute_pass", path, nullptr, 0);
+
+        //Culling Pass
+        auto culling_shader_path = platform::DirectoryPath::get().get_shader_path("compute", "gaussian_culling.comp");
+        subpass_shaders[ShaderObjectType::CullingComputePass] = material_utils.create_compute_material("compute_pass", culling_shader_path, nullptr, 0);
+
+        //Histogram Pass
+        auto histogram_shader_path = platform::DirectoryPath::get().get_shader_path("compute", "multi_radixsort_histograms.comp");
+        subpass_shaders[ShaderObjectType::HistogramComputePass] = material_utils.create_compute_material("compute_pass", histogram_shader_path, nullptr, 0);
+
+        //Radix sort
+        auto radixsort_shader_path = platform::DirectoryPath::get().get_shader_path("compute", "multi_radixsort.comp");
+        subpass_shaders[ShaderObjectType::SortComputePass] = material_utils.create_compute_material("compute_pass", radixsort_shader_path, nullptr, 0);
     }
 
     void ComputePass::render_target_init(EngineRenderTargets& render_targets)
@@ -29,9 +38,11 @@ namespace core::rendering
     }
 
     void ComputePass::record_commands(VkCommandBuffer* command_buffer, uint32_t image_index, PushConstantBlock& push_constant_block, SubpassShaderList& subpass_shaders,
-                                     GPU_BufferContainer& buffer_container, EngineRenderTargets& render_targets, const std::vector<Renderable>& renderables)
+                                     GPU_BufferContainer& buffer_container,
+                                     EngineRenderTargets& render_targets,
+                                     const std::vector<Renderable>& renderables)
     {
-        auto& material = subpass_shaders[ShaderObjectType::ComputePass];
+        auto& compute_material = subpass_shaders[ShaderObjectType::CullingComputePass];
         auto& dispatch_table = engine_context.dispatch_table;
 
         // Populate push constants with splat buffer addresses
@@ -55,10 +66,10 @@ namespace core::rendering
         push_constant_block.splat_render_params_address = buffer_container.splat_render_params_buffer.buffer_address;
 
         // Bind compute shader
-        material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
+        compute_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
 
         // Push constants
-        dispatch_table.cmdPushConstants(*command_buffer, material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantBlock), &push_constant_block);
+        dispatch_table.cmdPushConstants(*command_buffer, compute_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantBlock), &push_constant_block);
 
         // Dispatch
         // Example: dispatch based on buffer size

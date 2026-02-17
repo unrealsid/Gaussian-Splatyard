@@ -26,12 +26,12 @@ layout(buffer_reference, std430) readonly buffer CameraData
     vec4 hfovxy_focal;
 };
 
-layout(buffer_reference, std430) readonly buffer SplatID       { int gi[]; };
-layout(buffer_reference, std430) readonly buffer SplatPosition { vec4 positions[]; };
-layout(buffer_reference, std430) readonly buffer SplatScale    { vec4 scales[]; };
-layout(buffer_reference, std430) readonly buffer SplatColor    { float colors[]; };
-layout(buffer_reference, std430) readonly buffer SplatQuat     { vec4 quats[]; };
-layout(buffer_reference, std430) readonly buffer SplatAlpha    { float alphas[]; };
+layout(buffer_reference, std430) readonly buffer SplatID        { int gi[]; };
+layout(buffer_reference, std430) readonly buffer SplatPosition  { vec4 positions[]; };
+layout(buffer_reference, std430) readonly buffer SplatScale     { vec4 scales[]; };
+layout(buffer_reference, std430) readonly buffer SplatColor     { float colors[]; };
+layout(buffer_reference, std430) readonly buffer SplatQuat      { vec4 quats[]; };
+layout(buffer_reference, std430) readonly buffer SplatAlpha     { float alphas[]; };
 
 layout(buffer_reference, std430) readonly buffer SplatRenderParams
 {
