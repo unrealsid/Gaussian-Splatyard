@@ -190,6 +190,7 @@ namespace core::rendering
     template void GPU_BufferContainer::allocate_named_buffer(const std::string& buffer_name, const std::vector<float>& gaussian_parameters, BufferAllocationType allocation_type);
     template void GPU_BufferContainer::allocate_named_buffer(const std::string& buffer_name, const std::vector<glm::vec2>& gaussian_parameters, BufferAllocationType allocation_type);
     template void GPU_BufferContainer::allocate_named_buffer(const std::string& buffer_name, const std::vector<uint32_t>& gaussian_parameters, BufferAllocationType allocation_type);
+    template void GPU_BufferContainer::allocate_named_buffer(const std::string& buffer_name, const std::vector<glm::uvec2>& gaussian_parameters, BufferAllocationType allocation_type);
 
     template <typename N>
     void GPU_BufferContainer::allocate_named_buffer_simple(const std::string& buffer_name, BufferAllocationType allocation_type)

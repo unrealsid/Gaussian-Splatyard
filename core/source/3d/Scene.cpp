@@ -10,28 +10,6 @@ namespace entity_3d
 {
     void Scene::populate_scene()
     {
-        //Planes for testing
-        // auto cube_vertices = ModelUtils::load_cube();
-        // auto cube_colors = ModelUtils::generate_vertex_colors(cube_vertices.size(), false, glm::vec4(1.0, 0.0, 0.0, 0.4));
-        //
-        // add_new_renderable("cube_1", cube_vertices, cube_colors, glm::vec3(-1.0, -1.0, -1.0), glm::vec3(0.01, 1.0, 1.0), 0.0f, glm::vec3(0.0, 1.0, 0.0), 1);
-        //
-        // cube_vertices = ModelUtils::load_cube();
-        // cube_colors = ModelUtils::generate_vertex_colors(cube_vertices.size(), false, glm::vec4(1.0, 1.0, 0.0, 0.4));
-        //
-        // add_new_renderable("cube_2", cube_vertices, cube_colors, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.01, 1.0, 1.0), 0.0f, glm::vec3(0.0, 1.0, 0.0), 1);
-        //
-        // cube_vertices = ModelUtils::load_cube();
-        // cube_colors = ModelUtils::generate_vertex_colors(cube_vertices.size(), false, glm::vec4(0.0, 0.0, 1.0, 0.4));
-        //
-        // add_new_renderable("cube_3", cube_vertices, cube_colors, glm::vec3(1.0, 1.0, 1.0), glm::vec3(0.01, 1.0, 1.0), 0.0f, glm::vec3(0.0, 0.0, 1.0), 1);
-        //
-        // //Tetrahedron for testing
-        // auto tetrahedron_vertices = ModelUtils::load_tetrahedron();
-        // auto tetrahedron_colors = ModelUtils::generate_vertex_colors(tetrahedron_vertices.size(), true);
-        //
-        // add_new_renderable("tetrahedron", tetrahedron_vertices, tetrahedron_colors, glm::vec3(2.0, 2.0, 2.0), glm::vec3(0.5f), 45.0, glm::vec3(0.0, 0.0, 1.0), 0);
-
         //Load the quad buffer we'll need for displaying the splat
         core::rendering::GPU_BufferContainer* gpu_buffer_container = engine_context.buffer_container.get();
         auto quad_vertices = ModelUtils::load_quad();
@@ -72,5 +50,16 @@ namespace entity_3d
         uint32_t visible_count = 0;
         gpu_buffer_container->allocate_named_buffer_simple<uint32_t>("visible_splat_count_buffer", BufferAllocationType::MappedAllocation);
         gpu_buffer_container->map_data("visible_splat_count_buffer", &visible_count, sizeof(uint32_t));
+
+        //Used as the alternative ping-pong buffer
+        std::vector<glm::uvec2> visible_splats_idx_buffer_alt(gpu_buffer_container->gaussian_count);
+        gpu_buffer_container->allocate_named_buffer("visible_splat_indices_buffer_alt", visible_splats_idx_buffer_alt);
+
+        constexpr uint32_t NUM_BLOCKS_PER_WORKGROUP = 32;
+        constexpr uint32_t WORKGROUP_SIZE = 256;
+        uint32_t num_workgroups = (gpu_buffer_container->gaussian_count + (NUM_BLOCKS_PER_WORKGROUP * WORKGROUP_SIZE) - 1) / (NUM_BLOCKS_PER_WORKGROUP * WORKGROUP_SIZE);
+
+        std::vector<uint32_t> histograms(num_workgroups * 256, 0);
+        gpu_buffer_container->allocate_named_buffer("histogram_data_buffer", histograms);
     }
 }

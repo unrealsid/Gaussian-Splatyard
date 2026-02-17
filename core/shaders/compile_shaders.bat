@@ -57,7 +57,7 @@ for /R "%SHADER_DIR%" %%F in (*.glsl) do (
 
     if defined STAGE (
         echo [SPV] !NAME!
-        "%GLSLANG%" -V --target-env vulkan1.3 -gVS -S !STAGE! "!FILE!" -o "!OUT!" !INCLUDE_FLAG!
+        "%GLSLANG%" -V -g -gVS --target-env vulkan1.4 -S !STAGE! "!FILE!" -o "!OUT!" !INCLUDE_FLAG!
         if errorlevel 1 (
             echo [ERROR] Failed to compile !FILE!
             exit /b 1

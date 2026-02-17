@@ -22,7 +22,7 @@ struct PushConstantsComputeCulling
 
     //Stores splats currently in view
     VkDeviceAddress reduced_splat_indices_address;
-    uint32_t visible_count;
+    VkDeviceAddress visible_count_address;
 };
 
 struct PushConstantsComputeHistograms

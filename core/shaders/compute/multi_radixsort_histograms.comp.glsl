@@ -9,6 +9,7 @@
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_ARB_shading_language_include : require
 
+#pragma optimize(off)
 
 #define WORKGROUP_SIZE 256 // assert WORKGROUP_SIZE >= RADIX_SORT_BINS
 #define RADIX_SORT_BINS 256
@@ -28,6 +29,7 @@ layout (push_constant, std430) uniform PushConstantsHistogram
 {
     uint g_num_elements;
     uint g_shift;
+    uint g_num_workgroups;
     uint g_num_blocks_per_workgroup;
 
     Elements_in elements_in_address;

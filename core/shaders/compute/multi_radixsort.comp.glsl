@@ -17,6 +17,8 @@
 #define RADIX_SORT_BINS 256
 #define SUBGROUP_SIZE 32// 32 NVIDIA; 64 AMD
 
+#pragma optimize(off)
+
 layout (local_size_x = WORKGROUP_SIZE) in;
 
 layout (buffer_reference, std430) buffer Elements_in {

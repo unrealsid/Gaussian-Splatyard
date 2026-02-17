@@ -190,6 +190,7 @@ template void utils::MemoryUtils::create_vertex_buffer_with_staging(EngineContex
 template void utils::MemoryUtils::create_vertex_buffer_with_staging(EngineContext& engine_context, const std::vector<float>& vertices, VkCommandPool command_pool, GPU_Buffer& out_vertex_buffer);
 template void utils::MemoryUtils::create_vertex_buffer_with_staging(EngineContext& engine_context, const std::vector<glm::vec2>& vertices, VkCommandPool command_pool, GPU_Buffer& out_vertex_buffer);
 template void utils::MemoryUtils::create_vertex_buffer_with_staging(EngineContext& engine_context, const std::vector<uint32_t>& vertices, VkCommandPool command_pool, GPU_Buffer& out_vertex_buffer);
+template void utils::MemoryUtils::create_vertex_buffer_with_staging(EngineContext& engine_context, const std::vector<glm::uvec2>& vertices, VkCommandPool command_pool, GPU_Buffer& out_vertex_buffer);
 
 template <typename V>
 void utils::MemoryUtils::create_index_buffer_with_staging(EngineContext& engine_context, const std::vector<uint32_t>& indices, VkCommandPool command_pool, GPU_Buffer& out_index_buffer)

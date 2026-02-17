@@ -18,7 +18,7 @@ namespace core::rendering
                              GPU_BufferContainer& buffer_container, EngineRenderTargets& render_targets, const std::vector<Renderable>& renderables) override;
         void cleanup() override;
 
-        bool is_pass_active() const override { return false; }
+        bool is_pass_active() const override { return true; }
 
     private:
         PushConstantsComputeCulling push_constants_compute_culling{};

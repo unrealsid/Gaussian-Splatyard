@@ -41,44 +41,125 @@ namespace core::rendering
                                       EngineRenderTargets& render_targets,
                                       const std::vector<Renderable>& renderables)
     {
-        auto& compute_material = subpass_shaders[ShaderObjectType::CullingComputePass];
+        uint32_t element_count = buffer_container.gaussian_count;
+        if (element_count == 0)
+            return;
+
         auto& dispatch_table = engine_context.dispatch_table;
 
-        // Populate push constants with splat buffer addresses
-        push_constants_compute_culling.camera_data_address = buffer_container.camera_data_buffer.buffer_address;
+        auto visible_splat_indices_buffer = buffer_container.get_buffer("visible_splat_indices_buffer");
+        auto visible_splat_indices_buffer_alt = buffer_container.get_buffer("visible_splat_indices_buffer_alt");
+        auto visible_splat_count_buffer = buffer_container.get_buffer("visible_splat_count_buffer");
+        auto splat_indices_buffer = buffer_container.get_buffer("splat_indices_buffer");
+        auto pos_buffer = buffer_container.get_buffer("positions");
+        auto histogram_buffer = buffer_container.get_buffer("histogram_data_buffer");
 
-        if (auto pos_buffer = buffer_container.get_buffer("positions"))
+        if (!visible_splat_indices_buffer || !visible_splat_indices_buffer_alt || !visible_splat_count_buffer || !splat_indices_buffer || !pos_buffer || !histogram_buffer)
         {
+            return;
+        }
+
+        // 0. Reset visible count
+        uint32_t zero = 0;
+        buffer_container.map_data("visible_splat_count_buffer", &zero, sizeof(uint32_t));
+
+        auto NUM_BLOCKS_PER_WORKGROUP = 32;
+
+        uint32_t globalInvocationSize = element_count / NUM_BLOCKS_PER_WORKGROUP;
+        uint32_t remainder = element_count % NUM_BLOCKS_PER_WORKGROUP;
+        globalInvocationSize += remainder > 0 ? 1 : 0;
+
+        // 1. Culling Pass
+        {
+            auto& compute_material = subpass_shaders[ShaderObjectType::CullingComputePass];
+            push_constants_compute_culling.camera_data_address = buffer_container.camera_data_buffer.buffer_address;
+            push_constants_compute_culling.splat_indices_address = splat_indices_buffer->buffer_address;
             push_constants_compute_culling.splat_positions_address = pos_buffer->buffer_address;
+            push_constants_compute_culling.reduced_splat_indices_address = visible_splat_indices_buffer->buffer_address;
+            push_constants_compute_culling.visible_count_address = visible_splat_count_buffer->buffer_address;
+
+            compute_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
+            dispatch_table.cmdPushConstants(*command_buffer, compute_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsComputeCulling), &push_constants_compute_culling);
+            dispatch_table.cmdDispatch(*command_buffer, globalInvocationSize, 1, 1);
         }
 
-        // Bind compute shader
-        compute_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
+        // Memory barrier: Culling -> Histogram
+        VkMemoryBarrier2 culling_to_hist_barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
+        culling_to_hist_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        culling_to_hist_barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        culling_to_hist_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        culling_to_hist_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
 
-        // Push constants
-        dispatch_table.cmdPushConstants(*command_buffer, compute_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsComputeCulling), &push_constants_compute_culling);
+        VkDependencyInfo culling_to_hist_dep = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+        culling_to_hist_dep.memoryBarrierCount = 1;
+        culling_to_hist_dep.pMemoryBarriers = &culling_to_hist_barrier;
+        dispatch_table.cmdPipelineBarrier2(*command_buffer, &culling_to_hist_dep);
 
-        // Dispatch
-        // Example: dispatch based on buffer size
-        uint32_t element_count = buffer_container.gaussian_count;
-        if (element_count > 0)
+        // 2. Radix Sort Passes
+
+        VkDeviceAddress ping_address = visible_splat_indices_buffer->buffer_address;
+        VkDeviceAddress pong_address = visible_splat_indices_buffer_alt->buffer_address;
+
+        for (uint32_t shift = 0; shift < 32; shift += 8)
         {
-            dispatch_table.cmdDispatch(*command_buffer, (element_count + 255) / 256, 1, 1);
+            // Histogram
+            {
+                auto& hist_material = subpass_shaders[ShaderObjectType::HistogramComputePass];
+                push_constants_compute_histograms.g_num_elements = element_count;
+                push_constants_compute_histograms.g_shift = shift;
+                push_constants_compute_histograms.g_num_workgroups = globalInvocationSize;
+                push_constants_compute_histograms.g_num_blocks_per_workgroup = NUM_BLOCKS_PER_WORKGROUP;
+                push_constants_compute_histograms.reduced_splat_indices_in_address = ping_address;
+                push_constants_compute_histograms.histogram_data_address = histogram_buffer->buffer_address;
+
+                hist_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
+                dispatch_table.cmdPushConstants(*command_buffer, hist_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsComputeHistograms), &push_constants_compute_histograms);
+                dispatch_table.cmdDispatch(*command_buffer, globalInvocationSize, 1, 1);
+            }
+
+            // Memory barrier: Histogram -> Sort
+            VkMemoryBarrier2 hist_to_sort_barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
+            hist_to_sort_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+            hist_to_sort_barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+            hist_to_sort_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+            hist_to_sort_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+
+            VkDependencyInfo hist_to_sort_dep = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+            hist_to_sort_dep.memoryBarrierCount = 1;
+            hist_to_sort_dep.pMemoryBarriers = &hist_to_sort_barrier;
+            dispatch_table.cmdPipelineBarrier2(*command_buffer, &hist_to_sort_dep);
+
+            // Sort
+            {
+                auto& sort_material = subpass_shaders[ShaderObjectType::SortComputePass];
+                push_constants_radix_sort.g_num_elements = element_count;
+                push_constants_radix_sort.g_shift = shift;
+                push_constants_radix_sort.g_num_workgroups = globalInvocationSize;
+                push_constants_radix_sort.g_num_blocks_per_workgroup = NUM_BLOCKS_PER_WORKGROUP;
+                push_constants_radix_sort.splat_indices_in_address = ping_address;
+                push_constants_radix_sort.splat_indices_out_address = pong_address;
+                push_constants_radix_sort.histogram_data_address = histogram_buffer->buffer_address;
+
+                sort_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
+                dispatch_table.cmdPushConstants(*command_buffer, sort_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsRadixSort), &push_constants_radix_sort);
+                dispatch_table.cmdDispatch(*command_buffer, globalInvocationSize, 1, 1);
+            }
+
+            // Swap ping-pong
+            std::swap(ping_address, pong_address);
+
+            // Memory barrier: Sort -> Next Histogram (or Graphics)
+            VkMemoryBarrier2 sort_to_next_barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
+            sort_to_next_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+            sort_to_next_barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+            sort_to_next_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            sort_to_next_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+
+            VkDependencyInfo sort_to_next_dep = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+            sort_to_next_dep.memoryBarrierCount = 1;
+            sort_to_next_dep.pMemoryBarriers = &sort_to_next_barrier;
+            dispatch_table.cmdPipelineBarrier2(*command_buffer, &sort_to_next_dep);
         }
-
-        // Memory barrier to ensure compute writes are visible to graphics
-        // Also ensure that the write to compute_output is finished before it's read
-        VkMemoryBarrier2 memory_barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
-        memory_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-        memory_barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
-        memory_barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
-        memory_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
-
-        VkDependencyInfo dependency_info = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
-        dependency_info.memoryBarrierCount = 1;
-        dependency_info.pMemoryBarriers = &memory_barrier;
-
-        dispatch_table.cmdPipelineBarrier2(*command_buffer, &dependency_info);
     }
 
     void ComputePass::cleanup()

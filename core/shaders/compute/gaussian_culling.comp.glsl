@@ -5,7 +5,9 @@
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_ARB_shading_language_include : require
 
-#define WORKGROUP_SIZE 1024
+#pragma optimize(off)
+
+#define WORKGROUP_SIZE 256
 layout (local_size_x = WORKGROUP_SIZE) in;
 
 layout(buffer_reference, std430) readonly buffer CameraData
@@ -36,7 +38,6 @@ layout(push_constant) uniform PushConstantsComputeCulling
 void main()
 {
     uint idx = gl_GlobalInvocationID.x;
-    visible_gis.visible_gi[idx] = uvec2(0, 0);
 
     CameraData camera_matrices = pc_compute_culling.camera_data_adddress;
     SplatID splat_ids = pc_compute_culling.splat_ids_address;
