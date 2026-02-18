@@ -7,7 +7,7 @@
 
 #pragma optimize(off)
 
-#define WORKGROUP_SIZE 256
+#define WORKGROUP_SIZE 512
 layout (local_size_x = WORKGROUP_SIZE) in;
 
 layout(buffer_reference, std430) readonly buffer CameraData
@@ -33,11 +33,17 @@ layout(push_constant) uniform PushConstantsComputeCulling
 
     VisibleSplatID visible_splat_ids_address;
     VisibleCount visible_count_address;
+    uint max_splats;
 } pc_compute_culling;
 
 void main()
 {
     uint idx = gl_GlobalInvocationID.x;
+
+    if(idx > pc_compute_culling.max_splats - 2)
+    {
+        return;
+    }
 
     CameraData camera_matrices = pc_compute_culling.camera_data_adddress;
     SplatID splat_ids = pc_compute_culling.splat_ids_address;
