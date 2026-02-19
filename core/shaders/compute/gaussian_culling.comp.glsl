@@ -19,7 +19,7 @@ layout(buffer_reference, std430) readonly buffer CameraData
 };
 
 //The buffer that is sent to the render pass
-layout(buffer_reference, std430) readonly buffer VisibleSplatID { uvec2 visible_gi[]; };
+layout(buffer_reference, std430) buffer VisibleSplatID          { uvec2 visible_gi[]; };
 layout(buffer_reference, std430) buffer VisibleCount            { uint visible_count; };
 
 layout(buffer_reference, std430) readonly buffer SplatID        { int gi[]; };
@@ -40,7 +40,7 @@ void main()
 {
     uint idx = gl_GlobalInvocationID.x;
 
-    if(idx > pc_compute_culling.max_splats - 2)
+    if(idx > pc_compute_culling.max_splats)
     {
         return;
     }
@@ -51,8 +51,8 @@ void main()
     VisibleSplatID visible_gis = pc_compute_culling.visible_splat_ids_address;
     VisibleCount visible_count_addr = pc_compute_culling.visible_count_address;
 
-    int splat_id = splat_ids.gi[idx];
-    vec4 g_pos = splat_positions.positions[splat_id];
+    //int splat_id = splat_ids.gi[idx];
+    vec4 g_pos = splat_positions.positions[idx];
 
     vec4 g_pos_view = camera_matrices.view_matrix * g_pos;
     vec4 g_pos_screen = camera_matrices.projection_matrix * g_pos_view;
@@ -63,7 +63,6 @@ void main()
     // Early culling
     if (any(greaterThan(abs(g_pos_screen.xyz), vec3(1.3))))
     {
-        //gl_Position = vec4(-100, -100, -100, 1);
         return;
     }
 
@@ -71,5 +70,5 @@ void main()
     uint out_idx = atomicAdd(visible_count_addr.visible_count, 1);
 
     //Convert float to uint to sort
-    visible_gis.visible_gi[idx] = uvec2(uint((1 - dist * 0.5 + 0.5) * 0xFFFF), gl_GlobalInvocationID.x);
+    visible_gis.visible_gi[out_idx] = uvec2(uint((1 - dist * 0.5 + 0.5) * 0xFFFF), gl_GlobalInvocationID.x);
 }

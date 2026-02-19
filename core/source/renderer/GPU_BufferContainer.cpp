@@ -154,12 +154,12 @@ namespace core::rendering
         auto device_manager = engine_context.device_manager.get();
 
         //Destroy the old buffer if we have a buffer with the same name
-        if (auto buffer = get_buffer(buffer_name))
-        {
-            vmaDestroyBuffer(device_manager->get_allocator(), buffer->buffer, buffer->allocation);
-            *buffer = { VK_NULL_HANDLE, VK_NULL_HANDLE, {}, {} };
-            buffers.erase(buffer_name);
-        }
+        // if (auto buffer = get_buffer(buffer_name))
+        // {
+        //     vmaDestroyBuffer(device_manager->get_allocator(), buffer->buffer, buffer->allocation);
+        //     *buffer = { VK_NULL_HANDLE, VK_NULL_HANDLE, {}, {} };
+        //     buffers.erase(buffer_name);
+        // }
 
         //Recreate it
         GPU_Buffer new_buffer;
@@ -232,5 +232,5 @@ namespace core::rendering
         set_buffer(buffer_name, new_buffer);
     }
 
-    template void GPU_BufferContainer::allocate_named_buffer_simple<uint32_t>(const std::string& buffer_name, BufferAllocationType allocation_type);
+    template void GPU_BufferContainer::allocate_named_buffer_simple<int>(const std::string& buffer_name, BufferAllocationType allocation_type);
 }

@@ -31,15 +31,15 @@ namespace core::rendering
         extents = swapchain_manager->get_extent();
 
         //Placeholder scene initialization
-        auto gaussian_surfaces = std::vector<glm::vec4>{ {0.0, 0.0, 0.0, 1.0} };
-        auto alphas = std::vector<float>{ 0.0 };
-
-        buffer_container.allocate_named_buffer("positions", gaussian_surfaces);
-        buffer_container.allocate_named_buffer("scales", gaussian_surfaces);
-        buffer_container.allocate_named_buffer("colors", gaussian_surfaces);
-        buffer_container.allocate_named_buffer("quaternions", gaussian_surfaces);
-        buffer_container.allocate_named_buffer("alpha", alphas);
-        buffer_container.gaussian_count = 1;
+        // auto gaussian_surfaces = std::vector<glm::vec4>{ {0.0, 0.0, 0.0, 1.0} };
+        // auto alphas = std::vector<float>{ 0.0 };
+        //
+        // buffer_container.allocate_named_buffer("positions", gaussian_surfaces);
+        // buffer_container.allocate_named_buffer("scales", gaussian_surfaces);
+        // buffer_container.allocate_named_buffer("colors", gaussian_surfaces);
+        // buffer_container.allocate_named_buffer("quaternions", gaussian_surfaces);
+        // buffer_container.allocate_named_buffer("alpha", alphas);
+        // buffer_container.gaussian_count = 1;
 
         //Register a new event to allocate memory when a new model is loaded
         engine_context.ui_action_manager->register_string_action(UIAction::ALLOCATE_SPLAT_MEMORY,

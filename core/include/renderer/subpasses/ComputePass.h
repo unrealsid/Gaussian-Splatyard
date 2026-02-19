@@ -24,5 +24,7 @@ namespace core::rendering
         PushConstantsComputeCulling push_constants_compute_culling{};
         PushConstantsComputeHistograms push_constants_compute_histograms{};
         PushConstantsRadixSort push_constants_radix_sort{};
+
+        VkDescriptorSetLayout culling_descriptor_layout = VK_NULL_HANDLE;
     };
 } // rendering

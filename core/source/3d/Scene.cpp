@@ -40,16 +40,14 @@ namespace entity_3d
 
         //Visible Indices buffer
         const auto count = static_cast<uint32_t>(positions.size());
-        std::vector<uint32_t> visible_indices(count);
-        std::iota(visible_indices.begin(), visible_indices.end(), 0);
-
+        std::vector<glm::uvec2> visible_indices(count);
         //The array of indices visible gaussians
         gpu_buffer_container->allocate_named_buffer("visible_splat_indices_buffer", visible_indices);
 
         //Visible gaussians count for compute pass
-        uint32_t visible_count = 0;
-        gpu_buffer_container->allocate_named_buffer_simple<uint32_t>("visible_splat_count_buffer", BufferAllocationType::MappedAllocation);
-        gpu_buffer_container->map_data("visible_splat_count_buffer", &visible_count, sizeof(uint32_t));
+        int visible_count = 0;
+        gpu_buffer_container->allocate_named_buffer_simple<int>("visible_splat_count_buffer", BufferAllocationType::MappedAllocation);
+        gpu_buffer_container->map_data("visible_splat_count_buffer", &visible_count, sizeof(int));
 
         //Used as the alternative ping-pong buffer
         std::vector<glm::uvec2> visible_splats_idx_buffer_alt(gpu_buffer_container->gaussian_count);

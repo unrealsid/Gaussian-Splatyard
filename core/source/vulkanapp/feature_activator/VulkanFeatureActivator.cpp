@@ -75,4 +75,28 @@ VkPhysicalDeviceDynamicRenderingLocalReadFeatures vulkanapp::VulkanFeatureActiva
     return dynamicRenderingFeatures;
 }
 
+VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR vulkanapp::VulkanFeatureActivator::create_shader_relaxed_extended_instruction_features()
+{
+    VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_RELAXED_EXTENDED_INSTRUCTION_FEATURES_KHR,
+        .pNext = nullptr,
+        .shaderRelaxedExtendedInstruction = VK_TRUE
+    };
+
+    return features;
+}
+
+VkPhysicalDeviceVulkan13Features vulkanapp::VulkanFeatureActivator::create_vulkan_13_features()
+{
+    VkPhysicalDeviceVulkan13Features features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+        .pNext = nullptr,
+        .shaderDemoteToHelperInvocation = VK_TRUE,
+        .synchronization2 = VK_TRUE,
+        .dynamicRendering = VK_TRUE
+    };
+
+    return features;
+}
+
 

@@ -51,7 +51,7 @@ namespace core::rendering
         auto visible_splat_indices_buffer_alt = buffer_container.get_buffer("visible_splat_indices_buffer_alt");
         auto visible_splat_count_buffer = buffer_container.get_buffer("visible_splat_count_buffer");
         auto splat_indices_buffer = buffer_container.get_buffer("splat_indices_buffer");
-        auto pos_buffer = buffer_container.get_buffer("positions");
+        auto pos_buffer = buffer_container.get_buffer("splat_positions_buffer");
         auto histogram_buffer = buffer_container.get_buffer("histogram_data_buffer");
 
         if (!visible_splat_indices_buffer || !visible_splat_indices_buffer_alt || !visible_splat_count_buffer || !splat_indices_buffer || !pos_buffer || !histogram_buffer)
@@ -59,16 +59,15 @@ namespace core::rendering
             return;
         }
 
-        // 0. Reset visible count
-        uint32_t zero = 0;
-        buffer_container.map_data("visible_splat_count_buffer", &zero, sizeof(uint32_t));
-
         constexpr auto WORKGROUP_SIZE = 512;
         constexpr auto RADIX_SORT_BINS  = 256;
         constexpr auto NUM_BLOCKS_PER_WORKGROUP = WORKGROUP_SIZE / RADIX_SORT_BINS;
 
         // 1. Culling Pass
         {
+            int visible_count = 0;
+            buffer_container.map_data("visible_splat_count_buffer", &visible_count, sizeof(int));
+
             auto& compute_material = subpass_shaders[ShaderObjectType::CullingComputePass];
             push_constants_compute_culling.camera_data_address = buffer_container.camera_data_buffer.buffer_address;
             push_constants_compute_culling.splat_indices_address = splat_indices_buffer->buffer_address;
@@ -153,7 +152,7 @@ namespace core::rendering
             VkMemoryBarrier2 sort_to_next_barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
             sort_to_next_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
             sort_to_next_barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
-            sort_to_next_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            sort_to_next_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
             sort_to_next_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
 
             VkDependencyInfo sort_to_next_dep = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };

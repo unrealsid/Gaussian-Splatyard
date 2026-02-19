@@ -68,18 +68,19 @@ bool vulkanapp::DeviceManager::device_init()
         .add_required_extension(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)
         .add_required_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)
         .add_required_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
+        .add_required_extension(VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME)
         //.add_required_extension(VK_KHR_MAINTENANCE_6_EXTENSION_NAME)
         .set_required_features(features)
         .set_surface(surface)
         .select();
 
-    auto dynamic_rendering_features = VulkanFeatureActivator::create_dynamic_rendering_features();
     auto shader_object_features = VulkanFeatureActivator::create_shader_object_features();
     auto device_memory_features = VulkanFeatureActivator::create_physics_device_buffer_address();
     auto descriptorIndexingFeatures = VulkanFeatureActivator::create_physical_device_descriptor_indexing_features();
-    auto synchronization2_features = VulkanFeatureActivator::create_synchronization2_features();
     auto vertex_input_dynamic_state_features = VulkanFeatureActivator::create_vertex_input_dynamic_state_features();
     auto dynamic_local_read_state_features = VulkanFeatureActivator::create_dynamic_rendering_local_read_features();
+    auto shader_relaxed_extended_instruction_features = VulkanFeatureActivator::create_shader_relaxed_extended_instruction_features();
+    auto vulkan_13_features = VulkanFeatureActivator::create_vulkan_13_features();
     
     if (!phys_device_ret)
     {
@@ -90,13 +91,13 @@ bool vulkanapp::DeviceManager::device_init()
 
     vkb::DeviceBuilder device_builder{ p_device };
     auto device_ret = device_builder
-        .add_pNext(&dynamic_rendering_features)
         .add_pNext(&shader_object_features)
         .add_pNext(&device_memory_features)
         .add_pNext(&descriptorIndexingFeatures)
-        .add_pNext(&synchronization2_features)
         .add_pNext(&vertex_input_dynamic_state_features)
         .add_pNext(&dynamic_local_read_state_features)
+        .add_pNext(&shader_relaxed_extended_instruction_features)
+        .add_pNext(&vulkan_13_features)
         .build();
     
     if (!device_ret)

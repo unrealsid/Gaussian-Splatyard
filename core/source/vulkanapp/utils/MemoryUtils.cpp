@@ -173,7 +173,8 @@ void utils::MemoryUtils::create_vertex_buffer_with_staging(EngineContext& engine
     // Create Vertex Buffer (Device Local) using VMA
     create_buffer(engine_context.dispatch_table, device_manager->get_allocator(), vertexBufferSize,
                   VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT, out_vertex_buffer);
+                  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                  VMA_MEMORY_USAGE_AUTO, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT, out_vertex_buffer);
 
     // Copy from Staging Vertex Buffer to Device Local Vertex Buffer
     copy_buffer(engine_context.dispatch_table, device_manager->get_graphics_queue(), command_pool, staging_vertex_buffer.buffer, out_vertex_buffer.buffer, vertexBufferSize);
@@ -262,7 +263,7 @@ void utils::MemoryUtils::allocate_buffer_with_mapped_access(const vkb::DispatchT
 {
     create_buffer(dispatch_table, allocator,
                   size,  
-                  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                   VMA_MEMORY_USAGE_AUTO, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
                   VMA_ALLOCATION_CREATE_MAPPED_BIT, buffer);
 }
@@ -272,7 +273,7 @@ void utils::MemoryUtils::allocate_buffer_with_random_access(const vkb::DispatchT
 {
     create_buffer(dispatch_table, allocator,
                   size,
-                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                   VMA_MEMORY_USAGE_AUTO, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
                   VMA_ALLOCATION_CREATE_MAPPED_BIT, buffer);
 }
