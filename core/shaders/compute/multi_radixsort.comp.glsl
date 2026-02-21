@@ -13,7 +13,7 @@
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_ARB_shading_language_include : require
 
-#define WORKGROUP_SIZE 256// assert WORKGROUP_SIZE >= RADIX_SORT_BINS
+#define WORKGROUP_SIZE 512// assert WORKGROUP_SIZE >= RADIX_SORT_BINS
 #define RADIX_SORT_BINS 256
 #define SUBGROUP_SIZE 32// 32 NVIDIA; 64 AMD
 

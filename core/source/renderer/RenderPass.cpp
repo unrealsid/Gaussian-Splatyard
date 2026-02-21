@@ -48,9 +48,6 @@ namespace core::rendering
 
     void RenderPass::record_subpasses(uint32_t image_index)
     {
-        //TODO: Need better sync -- works for now, though
-        engine_context.dispatch_table.deviceWaitIdle();
-
         for (auto & subpass : subpasses)
         {
             subpass->frame_pre_recording();
@@ -107,6 +104,39 @@ namespace core::rendering
         }
     }
 
+    void RenderPass::record_compute_pass_and_submit(const uint32_t image_index, const vkb::DispatchTable& dispatch_table)
+    {
+        VkCommandBuffer compute_cmd = compute_command_buffers[current_frame];
+        dispatch_table.resetCommandBuffer(compute_cmd, 0);
+
+        VkCommandBufferBeginInfo begin_info = {};
+        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        dispatch_table.beginCommandBuffer(compute_cmd, &begin_info);
+
+        compute_pass->record_commands(&compute_cmd, image_index, subpass_shader_objects, *(engine_context.buffer_container), engine_render_targets, engine_context.renderer->get_renderables());
+
+        dispatch_table.endCommandBuffer(compute_cmd);
+
+        // Submit compute pass
+        VkSubmitInfo2 compute_submit_info = { VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
+
+        VkCommandBufferSubmitInfo compute_cmd_info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
+        compute_cmd_info.commandBuffer = compute_cmd;
+
+        compute_submit_info.commandBufferInfoCount = 1;
+        compute_submit_info.pCommandBufferInfos = &compute_cmd_info;
+
+        VkSemaphoreSubmitInfo compute_signal_info = { VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
+        compute_signal_info.semaphore = compute_finished_semaphores[current_frame];
+        compute_signal_info.stageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+
+        compute_submit_info.signalSemaphoreInfoCount = 1;
+        compute_submit_info.pSignalSemaphoreInfos = &compute_signal_info;
+
+        dispatch_table.resetFences(1, &compute_in_flight_fences[0]);
+        dispatch_table.queueSubmit2(device_manager->get_graphics_queue(), 1, &compute_submit_info, compute_in_flight_fences[0]);
+    }
+
     void RenderPass::record_commands_and_draw()
     {
         uint32_t image_index = 0;
@@ -118,7 +148,6 @@ namespace core::rendering
         if (result == VK_ERROR_OUT_OF_DATE_KHR)
         {
             recreate_render_resources();
-
             return;
         }
 
@@ -129,43 +158,17 @@ namespace core::rendering
 
         if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         {
-            //std::cout << "failed to acquire swapchain image. Error " << result << "\n";
+            std::cerr << "failed to acquire swapchain image. Error " << result << "\n";
             return;
         }
 
+        //TODO: Need better sync -- works for now, though
+        engine_context.dispatch_table.deviceWaitIdle();
+
         // Record compute pass
-        VkCommandBuffer compute_cmd = compute_command_buffers[current_frame];
-        dispatch_table.resetCommandBuffer(compute_cmd, 0);
-
-        VkCommandBufferBeginInfo begin_info = {};
-        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        dispatch_table.beginCommandBuffer(compute_cmd, &begin_info);
-
-        PushConstantBlock push_constant_block{};
-        compute_pass->record_commands(&compute_cmd, image_index, subpass_shader_objects, *(engine_context.buffer_container),
-                                      engine_render_targets, engine_context.renderer->get_renderables());
-
-        dispatch_table.endCommandBuffer(compute_cmd);
-
-        // Submit compute pass
-        VkSubmitInfo2 compute_submit_info = { VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
-        
-        VkCommandBufferSubmitInfo compute_cmd_info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
-        compute_cmd_info.commandBuffer = compute_cmd;
-        
-        compute_submit_info.commandBufferInfoCount = 1;
-        compute_submit_info.pCommandBufferInfos = &compute_cmd_info;
-
-        VkSemaphoreSubmitInfo compute_signal_info = { VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
-        compute_signal_info.semaphore = compute_finished_semaphores[current_frame];
-        compute_signal_info.stageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-
-        compute_submit_info.signalSemaphoreInfoCount = 1;
-        compute_submit_info.pSignalSemaphoreInfos = &compute_signal_info;
-
-        dispatch_table.queueSubmit2(device_manager->get_graphics_queue(), 1, &compute_submit_info, VK_NULL_HANDLE);
-
+        record_compute_pass_and_submit(image_index, dispatch_table);
         record_subpasses(image_index);
+
         draw_frame(image_index);
     }
 
@@ -357,38 +360,38 @@ namespace core::rendering
 
         image_in_flight[image_index] = in_flight_fences[current_frame];
 
-        VkSubmitInfo2 submitInfo = {};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        VkSubmitInfo2 submit_info = {};
+        submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
 
-        VkSemaphoreSubmitInfo waitSemaphoreSubmitInfo[2] = {};
-        waitSemaphoreSubmitInfo[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        waitSemaphoreSubmitInfo[0].semaphore = available_semaphores[current_frame];
-        waitSemaphoreSubmitInfo[0].stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        VkSemaphoreSubmitInfo wait_semaphore_submit_info[2] = {};
+        wait_semaphore_submit_info[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        wait_semaphore_submit_info[0].semaphore = available_semaphores[current_frame];
+        wait_semaphore_submit_info[0].stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-        waitSemaphoreSubmitInfo[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        waitSemaphoreSubmitInfo[1].semaphore = compute_finished_semaphores[current_frame];
-        waitSemaphoreSubmitInfo[1].stageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        wait_semaphore_submit_info[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        wait_semaphore_submit_info[1].semaphore = compute_finished_semaphores[current_frame];
+        wait_semaphore_submit_info[1].stageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 
-        submitInfo.waitSemaphoreInfoCount = 2;
-        submitInfo.pWaitSemaphoreInfos = waitSemaphoreSubmitInfo;
+        submit_info.waitSemaphoreInfoCount = 2;
+        submit_info.pWaitSemaphoreInfos = wait_semaphore_submit_info;
 
         VkCommandBufferSubmitInfo commandBufferSubmitInfo = {};
         commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
         commandBufferSubmitInfo.commandBuffer = command_buffers[current_frame];
 
-        submitInfo.commandBufferInfoCount = 1;
-        submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
+        submit_info.commandBufferInfoCount = 1;
+        submit_info.pCommandBufferInfos = &commandBufferSubmitInfo;
 
         VkSemaphoreSubmitInfo signalSemaphoreSubmitInfo = {};
         signalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         signalSemaphoreSubmitInfo.semaphore = finished_semaphores[current_frame];
         signalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT; // Signal when all commands are done
 
-        submitInfo.signalSemaphoreInfoCount = 1;
-        submitInfo.pSignalSemaphoreInfos = &signalSemaphoreSubmitInfo;
+        submit_info.signalSemaphoreInfoCount = 1;
+        submit_info.pSignalSemaphoreInfos = &signalSemaphoreSubmitInfo;
 
         dispatch_table.resetFences(1, &in_flight_fences[current_frame]);
-        if (dispatch_table.queueSubmit2(device_manager->get_graphics_queue(), 1, &submitInfo, in_flight_fences[current_frame]) != VK_SUCCESS)
+        if (dispatch_table.queueSubmit2(device_manager->get_graphics_queue(), 1, &submit_info, in_flight_fences[current_frame]) != VK_SUCCESS)
         {
             std::cout << "failed to submit draw command buffer\n";
             return false;
@@ -411,7 +414,6 @@ namespace core::rendering
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
         {
             recreate_render_resources();
-
             return true;
         }
 
@@ -426,24 +428,34 @@ namespace core::rendering
     }
 
     bool RenderPass::create_sync_objects()
-   {
-       available_semaphores.assign(max_frames_in_flight, VK_NULL_HANDLE);
-       finished_semaphores.assign(max_frames_in_flight, VK_NULL_HANDLE);
-       compute_finished_semaphores.assign(max_frames_in_flight, VK_NULL_HANDLE);
-       in_flight_fences.assign(max_frames_in_flight, VK_NULL_HANDLE);
-       image_in_flight.assign(swapchain_manager->get_image_count(), VK_NULL_HANDLE);
+    {
+        available_semaphores.assign(max_frames_in_flight, VK_NULL_HANDLE);
+        finished_semaphores.assign(max_frames_in_flight, VK_NULL_HANDLE);
+        compute_finished_semaphores.assign(max_frames_in_flight, VK_NULL_HANDLE);
+        in_flight_fences.assign(max_frames_in_flight, VK_NULL_HANDLE);
+        image_in_flight.assign(swapchain_manager->get_image_count(), VK_NULL_HANDLE);
+        compute_in_flight_fences.assign(2, VK_NULL_HANDLE); //For now, we account for just the culling pass and the final compute that sorts the splats
 
-       VkSemaphoreCreateInfo semaphore_info = {};
-       semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        VkSemaphoreCreateInfo semaphore_info = {};
+        semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-       VkFenceCreateInfo fence_info = {};
-       fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-       fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        VkFenceCreateInfo fence_info = {};
+        fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-       auto dispatch_table = engine_context.dispatch_table;
+        auto dispatch_table = engine_context.dispatch_table;
 
-       for (size_t i = 0; i < max_frames_in_flight; i++)
-       {
+        for (size_t i = 0; i < 2; i++)
+        {
+            if (dispatch_table.createFence(&fence_info, nullptr, &compute_in_flight_fences[i]) != VK_SUCCESS)
+            {
+                std::cout << "failed to create fence\n";
+                return false;
+            }
+        }
+
+        for (size_t i = 0; i < max_frames_in_flight; i++)
+        {
            if (dispatch_table.createSemaphore(&semaphore_info, nullptr, &available_semaphores[i]) != VK_SUCCESS ||
                dispatch_table.createSemaphore(&semaphore_info, nullptr, &finished_semaphores[i]) != VK_SUCCESS ||
                dispatch_table.createSemaphore(&semaphore_info, nullptr, &compute_finished_semaphores[i]) != VK_SUCCESS ||
@@ -452,7 +464,7 @@ namespace core::rendering
                std::cout << "failed to create sync objects\n";
                return false;
            }
-       }
+        }
 
        return true;
    }

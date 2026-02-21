@@ -43,7 +43,10 @@ namespace core::rendering
     {
         uint32_t element_count = buffer_container.gaussian_count;
         if (element_count == 0)
+        {
+            std::cout << "No elements to render!" << std::endl;
             return;
+        }
 
         auto& dispatch_table = engine_context.dispatch_table;
 
@@ -76,7 +79,7 @@ namespace core::rendering
             push_constants_compute_culling.visible_count_address = visible_splat_count_buffer->buffer_address;
             push_constants_compute_culling.g_num_elements = element_count;
 
-            uint32_t num_groups = (element_count + 511) / 512;
+            uint32_t num_groups = (element_count + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
 
             compute_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
             dispatch_table.cmdPushConstants(*command_buffer, compute_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsComputeCulling), &push_constants_compute_culling);
@@ -95,58 +98,67 @@ namespace core::rendering
         culling_to_hist_dep.pMemoryBarriers = &culling_to_hist_barrier;
         dispatch_table.cmdPipelineBarrier2(*command_buffer, &culling_to_hist_dep);
 
-        // 2. Radix Sort Passes
+        //TODO: Remove this fence afterwards. Will need to implement an indirect compute pass
+        auto compute_culling_fence = engine_context.renderer->get_render_pass()->get_compute_fences();
+        dispatch_table.waitForFences(1, &compute_culling_fence[0], VK_TRUE, UINT64_MAX);
 
-        // VkDeviceAddress ping_address = visible_splat_indices_buffer->buffer_address;
-        // VkDeviceAddress pong_address = visible_splat_indices_buffer_alt->buffer_address;
-        //
-        // for (uint32_t shift = 0; shift < 32; shift += 8)
-        // {
-        //     // Histogram
-        //     {
-        //         auto& hist_material = subpass_shaders[ShaderObjectType::HistogramComputePass];
-        //         push_constants_compute_histograms.g_num_elements = element_count;
-        //         push_constants_compute_histograms.g_shift = shift;
-        //         push_constants_compute_histograms.g_num_workgroups = globalInvocationSize;
-        //         push_constants_compute_histograms.g_num_blocks_per_workgroup = NUM_BLOCKS_PER_WORKGROUP;
-        //         push_constants_compute_histograms.reduced_splat_indices_in_address = ping_address;
-        //         push_constants_compute_histograms.histogram_data_address = histogram_buffer->buffer_address;
-        //
-        //         hist_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
-        //         dispatch_table.cmdPushConstants(*command_buffer, hist_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsComputeHistograms), &push_constants_compute_histograms);
-        //         dispatch_table.cmdDispatch(*command_buffer, globalInvocationSize, 1, 1);
-        //     }
-        //
-        //     // Memory barrier: Histogram -> Sort
-        //     VkMemoryBarrier2 hist_to_sort_barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
-        //     hist_to_sort_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-        //     hist_to_sort_barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
-        //     hist_to_sort_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-        //     hist_to_sort_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-        //
-        //     VkDependencyInfo hist_to_sort_dep = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
-        //     hist_to_sort_dep.memoryBarrierCount = 1;
-        //     hist_to_sort_dep.pMemoryBarriers = &hist_to_sort_barrier;
-        //     dispatch_table.cmdPipelineBarrier2(*command_buffer, &hist_to_sort_dep);
-        //
-        //     // Sort
-        //     {
-        //         auto& sort_material = subpass_shaders[ShaderObjectType::SortComputePass];
-        //         push_constants_radix_sort.g_num_elements = element_count;
-        //         push_constants_radix_sort.g_shift = shift;
-        //         push_constants_radix_sort.g_num_workgroups = globalInvocationSize;
-        //         push_constants_radix_sort.g_num_blocks_per_workgroup = NUM_BLOCKS_PER_WORKGROUP;
-        //         push_constants_radix_sort.splat_indices_in_address = ping_address;
-        //         push_constants_radix_sort.splat_indices_out_address = pong_address;
-        //         push_constants_radix_sort.histogram_data_address = histogram_buffer->buffer_address;
-        //
-        //         sort_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
-        //         dispatch_table.cmdPushConstants(*command_buffer, sort_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsRadixSort), &push_constants_radix_sort);
-        //         dispatch_table.cmdDispatch(*command_buffer, globalInvocationSize, 1, 1);
-        //     }
-        //
-        //     // Swap ping-pong
-        //     std::swap(ping_address, pong_address);
+        int visible_splats = 0;
+        memcpy(&visible_splats, visible_splat_count_buffer->allocation_info.pMappedData, sizeof(int));
+        uint32_t num_groups = (visible_splats + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
+
+        // 2. Radix Sort Passes
+        VkDeviceAddress ping_address = visible_splat_indices_buffer->buffer_address;
+        VkDeviceAddress pong_address = visible_splat_indices_buffer_alt->buffer_address;
+
+        for (uint32_t shift = 0; shift < 32; shift += 8)
+        {
+            // Histogram
+            {
+                auto& hist_material = subpass_shaders[ShaderObjectType::HistogramComputePass];
+                push_constants_compute_histograms.g_num_elements = visible_splats;
+                push_constants_compute_histograms.g_shift = shift;
+                push_constants_compute_histograms.g_num_workgroups = num_groups;
+                push_constants_compute_histograms.g_num_blocks_per_workgroup = NUM_BLOCKS_PER_WORKGROUP;
+                push_constants_compute_histograms.reduced_splat_indices_in_address = ping_address;
+                push_constants_compute_histograms.histogram_data_address = histogram_buffer->buffer_address;
+
+                hist_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
+
+                dispatch_table.cmdPushConstants(*command_buffer, hist_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsComputeHistograms), &push_constants_compute_histograms);
+                dispatch_table.cmdDispatch(*command_buffer, num_groups, 1, 1);
+            }
+
+            // Memory barrier: Histogram -> Sort
+            VkMemoryBarrier2 hist_to_sort_barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
+            hist_to_sort_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+            hist_to_sort_barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+            hist_to_sort_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+            hist_to_sort_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+
+            VkDependencyInfo hist_to_sort_dep = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+            hist_to_sort_dep.memoryBarrierCount = 1;
+            hist_to_sort_dep.pMemoryBarriers = &hist_to_sort_barrier;
+            dispatch_table.cmdPipelineBarrier2(*command_buffer, &hist_to_sort_dep);
+            //
+            //     // Sort
+            //     {
+            //         auto& sort_material = subpass_shaders[ShaderObjectType::SortComputePass];
+            //         push_constants_radix_sort.g_num_elements = element_count;
+            //         push_constants_radix_sort.g_shift = shift;
+            //         push_constants_radix_sort.g_num_workgroups = globalInvocationSize;
+            //         push_constants_radix_sort.g_num_blocks_per_workgroup = NUM_BLOCKS_PER_WORKGROUP;
+            //         push_constants_radix_sort.splat_indices_in_address = ping_address;
+            //         push_constants_radix_sort.splat_indices_out_address = pong_address;
+            //         push_constants_radix_sort.histogram_data_address = histogram_buffer->buffer_address;
+            //
+            //         sort_material->get_shader_object()->bind_material_shader(dispatch_table, *command_buffer);
+            //         dispatch_table.cmdPushConstants(*command_buffer, sort_material->get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsRadixSort), &push_constants_radix_sort);
+            //         dispatch_table.cmdDispatch(*command_buffer, globalInvocationSize, 1, 1);
+            //     }
+            //
+            //     // Swap ping-pong
+            std::swap(ping_address, pong_address);
+        }
 
             // Memory barrier: Sort -> Next Histogram (or Graphics)
             VkMemoryBarrier2 sort_to_next_barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };

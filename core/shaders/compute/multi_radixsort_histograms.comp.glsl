@@ -11,13 +11,13 @@
 
 #pragma optimize(off)
 
-#define WORKGROUP_SIZE 256 // assert WORKGROUP_SIZE >= RADIX_SORT_BINS
+#define WORKGROUP_SIZE 512 // assert WORKGROUP_SIZE >= RADIX_SORT_BINS
 #define RADIX_SORT_BINS 256
 
 layout (local_size_x = WORKGROUP_SIZE) in;
 
 layout (buffer_reference, std430) buffer Elements_in {
-    uint g_elements_in[];
+    uvec2 g_elements_in[];
 };
 
 layout (buffer_reference, std430) buffer Histograms {
@@ -40,6 +40,12 @@ shared uint[RADIX_SORT_BINS] histogram;
 
 void main() {
     uint gID = gl_GlobalInvocationID.x;
+
+    if(gID > pc_histograms.g_num_elements)
+    {
+        return;
+    }
+
     uint lID = gl_LocalInvocationID.x;
     uint wID = gl_WorkGroupID.x;
 
@@ -56,14 +62,14 @@ void main() {
         uint elementId = wID * pc_histograms.g_num_blocks_per_workgroup * WORKGROUP_SIZE + index * WORKGROUP_SIZE + lID;
         if (elementId < pc_histograms.g_num_elements) {
             // determine the bin
-            const uint bin = uint(e_in_addr.g_elements_in[elementId] >> pc_histograms.g_shift) & uint(RADIX_SORT_BINS - 1);
+            const uint bin = uint(e_in_addr.g_elements_in[elementId].x >> pc_histograms.g_shift) & uint(RADIX_SORT_BINS - 1);
             // increment the histogram
             atomicAdd(histogram[bin], 1U);
         }
     }
     barrier();
 
-    if (lID < RADIX_SORT_BINS) {
+    if (lID < RADIX_SORT_BINS){
         histogram_addr.g_histograms[RADIX_SORT_BINS * wID + lID] = histogram[lID];
     }
 }

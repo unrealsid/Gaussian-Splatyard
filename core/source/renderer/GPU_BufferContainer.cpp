@@ -154,12 +154,12 @@ namespace core::rendering
         auto device_manager = engine_context.device_manager.get();
 
         //Destroy the old buffer if we have a buffer with the same name
-        // if (auto buffer = get_buffer(buffer_name))
-        // {
-        //     vmaDestroyBuffer(device_manager->get_allocator(), buffer->buffer, buffer->allocation);
-        //     *buffer = { VK_NULL_HANDLE, VK_NULL_HANDLE, {}, {} };
-        //     buffers.erase(buffer_name);
-        // }
+        if (auto buffer = get_buffer(buffer_name))
+        {
+            vmaDestroyBuffer(device_manager->get_allocator(), buffer->buffer, buffer->allocation);
+            *buffer = { VK_NULL_HANDLE, VK_NULL_HANDLE, {}, {} };
+            buffers.erase(buffer_name);
+        }
 
         //Recreate it
         GPU_Buffer new_buffer;

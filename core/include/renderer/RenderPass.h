@@ -35,6 +35,8 @@ namespace core::rendering
 
         [[nodiscard]] VkCommandPool get_command_pool() const { return command_pool; }
 
+        [[nodiscard]] std::vector<VkFence>& get_compute_fences() { return compute_in_flight_fences; }
+
         void create_command_pool();
         void reset_command_pool();
 
@@ -49,6 +51,7 @@ namespace core::rendering
         bool draw_frame(uint32_t image_index);
 
         void record_subpasses(uint32_t image_index);
+        void record_compute_pass_and_submit(uint32_t image_index, const vkb::DispatchTable& dispatch_table);
         void recreate_render_resources();
 
         void record_commands_and_draw();
@@ -69,6 +72,7 @@ namespace core::rendering
 
         std::vector<VkFence> in_flight_fences;
         std::vector<VkFence> image_in_flight;
+        std::vector<VkFence> compute_in_flight_fences;
 
         EngineContext& engine_context;
 
